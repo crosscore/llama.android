@@ -133,7 +133,7 @@ class MainActivity(
         val request = DownloadManager.Request(Uri.parse(MODEL_URL))
             .setTitle("Downloading TinySlime 1.1B Chat Model")
             .setDescription("Downloading $MODEL_FILE_NAME")
-            .setNotificationVisibility(DownloadManager.REQUEST_VISIBLE_NOTIFY_COMPLETED)
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalFilesDir(this, null, MODEL_FILE_NAME)
 
         downloadId = downloadManager.enqueue(request)
