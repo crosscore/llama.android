@@ -1,3 +1,4 @@
+// llama.android/app/src/main/java/com/example/llama/MainViewModel.kt
 package com.example.llama
 
 import android.llama.cpp.LLamaAndroid

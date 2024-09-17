@@ -1,9 +1,14 @@
+// llama.android/app/src/main/java/com/example/llama/MainActivity.kt
 package com.example.llama
 
 import android.app.ActivityManager
 import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
 import android.os.StrictMode
@@ -38,15 +43,29 @@ class MainActivity(
     downloadManager: DownloadManager? = null,
     clipboardManager: ClipboardManager? = null,
 ): ComponentActivity() {
-    private val tag: String? = this::class.simpleName
-
     private val activityManager by lazy { activityManager ?: getSystemService<ActivityManager>()!! }
     private val downloadManager by lazy { downloadManager ?: getSystemService<DownloadManager>()!! }
     private val clipboardManager by lazy { clipboardManager ?: getSystemService<ClipboardManager>()!! }
 
     private val viewModel: MainViewModel by viewModels()
 
-    // Get a MemoryInfo object for the device's current memory status.
+    private var downloadId: Long = 0
+
+    private val downloadReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+            if (id == downloadId) {
+                viewModel.log("Download completed")
+                val modelFile = File(getExternalFilesDir(null), MODEL_FILE_NAME)
+                if (modelFile.exists()) {
+                    viewModel.load(modelFile.absolutePath)
+                } else {
+                    viewModel.log("Downloaded file not found")
+                }
+            }
+        }
+    }
+
     private fun availableMemory(): ActivityManager.MemoryInfo {
         return ActivityManager.MemoryInfo().also { memoryInfo ->
             activityManager.getMemoryInfo(memoryInfo)
@@ -62,6 +81,8 @@ class MainActivity(
                 .build()
         )
 
+        registerReceiver(downloadReceiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+
         val free = Formatter.formatFileSize(this, availableMemory().availMem)
         val total = Formatter.formatFileSize(this, availableMemory().totalMem)
 
@@ -69,28 +90,24 @@ class MainActivity(
         viewModel.log("Downloads directory: ${getExternalFilesDir(null)}")
 
         val extFilesDir = getExternalFilesDir(null)
+        val modelFile = File(extFilesDir, MODEL_FILE_NAME)
+
+        if (!modelFile.exists()) {
+            downloadModel()
+        } else {
+            viewModel.load(modelFile.absolutePath)
+        }
 
         val models = listOf(
             Downloadable(
-                "Phi-2 7B (Q4_0, 1.6 GiB)",
-                Uri.parse("https://huggingface.co/ggml-org/models/resolve/main/phi-2/ggml-model-q4_0.gguf?download=true"),
-                File(extFilesDir, "phi-2-q4_0.gguf"),
-            ),
-            Downloadable(
-                "TinyLlama 1.1B (f16, 2.2 GiB)",
-                Uri.parse("https://huggingface.co/ggml-org/models/resolve/main/tinyllama-1.1b/ggml-model-f16.gguf?download=true"),
-                File(extFilesDir, "tinyllama-1.1-f16.gguf"),
-            ),
-            Downloadable(
-                "Phi 2 DPO (Q3_K_M, 1.48 GiB)",
-                Uri.parse("https://huggingface.co/TheBloke/phi-2-dpo-GGUF/resolve/main/phi-2-dpo.Q3_K_M.gguf?download=true"),
-                File(extFilesDir, "phi-2-dpo.Q3_K_M.gguf")
-            ),
+                MODEL_NAME,
+                Uri.EMPTY,
+                modelFile
+            )
         )
 
         setContent {
             LlamaAndroidTheme {
-                // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -102,9 +119,29 @@ class MainActivity(
                         models,
                     )
                 }
-
             }
         }
+    }
+
+    private fun downloadModel() {
+        val request = DownloadManager.Request(Uri.parse(MODEL_URL))
+            .setTitle("Downloading Llama 3 Youko 8B Model")
+            .setDescription("Downloading $MODEL_FILE_NAME")
+            .setNotificationVisibility(DownloadManager.REQUEST_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationInExternalFilesDir(this, null, MODEL_FILE_NAME)
+
+        downloadId = downloadManager.enqueue(request)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        unregisterReceiver(downloadReceiver)
+    }
+
+    companion object {
+        const val MODEL_URL = "https://huggingface.co/QuantFactory/llama-3-youko-8b-GGUF/raw/main/llama-3-youko-8b.Q2_K.gguf"
+        const val MODEL_FILE_NAME = "llama-3-youko-8b.Q2_K.gguf"
+        const val MODEL_NAME = "Llama 3 Youko 8B Q2_K"
     }
 }
 
