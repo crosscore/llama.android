@@ -42,29 +42,17 @@ class MainActivity(
     activityManager: ActivityManager? = null,
     downloadManager: DownloadManager? = null,
     clipboardManager: ClipboardManager? = null,
-): ComponentActivity() {
+) : ComponentActivity() {
     private val activityManager by lazy { activityManager ?: getSystemService<ActivityManager>()!! }
     private val downloadManager by lazy { downloadManager ?: getSystemService<DownloadManager>()!! }
     private val clipboardManager by lazy { clipboardManager ?: getSystemService<ClipboardManager>()!! }
 
-    private val viewModel: MainViewModel by viewModels()
-
-    private var downloadId: Long = 0
-
-    private val downloadReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
-            if (id == downloadId) {
-                viewModel.log("Download completed")
-                val modelFile = File(getExternalFilesDir(null), MODEL_FILE_NAME)
-                if (modelFile.exists()) {
-                    viewModel.load(modelFile.absolutePath)
-                } else {
-                    viewModel.log("Downloaded file not found")
-                }
-            }
-        }
+    private val _viewModel: MainViewModel by viewModels()
+    init {
+        viewModel = _viewModel
     }
+
+    private val downloadReceiver = DownloadCompletedReceiver()
 
     private fun availableMemory(): ActivityManager.MemoryInfo {
         return ActivityManager.MemoryInfo().also { memoryInfo ->
@@ -81,7 +69,11 @@ class MainActivity(
                 .build()
         )
 
-        registerReceiver(downloadReceiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+        registerReceiver(
+            downloadReceiver,
+            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            RECEIVER_EXPORTED
+        )
 
         val free = Formatter.formatFileSize(this, availableMemory().availMem)
         val total = Formatter.formatFileSize(this, availableMemory().totalMem)
@@ -123,12 +115,6 @@ class MainActivity(
         }
     }
 
-    companion object {
-        const val MODEL_URL = "https://huggingface.co/QuantFactory/TinySlime-1.1B-Chat-v1.0-GGUF/raw/main/TinySlime-1.1B-Chat-v1.0.Q8_0.gguf"
-        const val MODEL_FILE_NAME = "TinySlime-1.1B-Chat-v1.0.Q8_0.gguf"
-        const val MODEL_NAME = "TinySlime 1.1B Chat v1.0 Q8_0"
-    }
-
     private fun downloadModel() {
         val request = DownloadManager.Request(Uri.parse(MODEL_URL))
             .setTitle("Downloading TinySlime 1.1B Chat Model")
@@ -142,6 +128,29 @@ class MainActivity(
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(downloadReceiver)
+    }
+
+    companion object {
+        const val MODEL_URL = "https://huggingface.co/QuantFactory/TinySlime-1.1B-Chat-v1.0-GGUF/raw/main/TinySlime-1.1B-Chat-v1.0.Q8_0.gguf"
+        const val MODEL_FILE_NAME = "TinySlime-1.1B-Chat-v1.0.Q8_0.gguf"
+        const val MODEL_NAME = "TinySlime 1.1B Chat v1.0 Q8_0"
+        lateinit var viewModel: MainViewModel
+        var downloadId: Long = 0
+    }
+}
+
+class DownloadCompletedReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+        if (id == MainActivity.downloadId) {
+            MainActivity.viewModel.log("Download completed")
+            val modelFile = File(context?.getExternalFilesDir(null), MainActivity.MODEL_FILE_NAME)
+            if (modelFile.exists()) {
+                MainActivity.viewModel.load(modelFile.absolutePath)
+            } else {
+                MainActivity.viewModel.log("Downloaded file not found")
+            }
+        }
     }
 }
 
