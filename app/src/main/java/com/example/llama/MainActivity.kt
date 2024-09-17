@@ -123,9 +123,15 @@ class MainActivity(
         }
     }
 
+    companion object {
+        const val MODEL_URL = "https://huggingface.co/QuantFactory/TinySlime-1.1B-Chat-v1.0-GGUF/raw/main/TinySlime-1.1B-Chat-v1.0.Q8_0.gguf"
+        const val MODEL_FILE_NAME = "TinySlime-1.1B-Chat-v1.0.Q8_0.gguf"
+        const val MODEL_NAME = "TinySlime 1.1B Chat v1.0 Q8_0"
+    }
+
     private fun downloadModel() {
         val request = DownloadManager.Request(Uri.parse(MODEL_URL))
-            .setTitle("Downloading Llama 3 Youko 8B Model")
+            .setTitle("Downloading TinySlime 1.1B Chat Model")
             .setDescription("Downloading $MODEL_FILE_NAME")
             .setNotificationVisibility(DownloadManager.REQUEST_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalFilesDir(this, null, MODEL_FILE_NAME)
@@ -136,12 +142,6 @@ class MainActivity(
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(downloadReceiver)
-    }
-
-    companion object {
-        const val MODEL_URL = "https://huggingface.co/QuantFactory/llama-3-youko-8b-GGUF/raw/main/llama-3-youko-8b.Q2_K.gguf"
-        const val MODEL_FILE_NAME = "llama-3-youko-8b.Q2_K.gguf"
-        const val MODEL_NAME = "Llama 3 Youko 8B Q2_K"
     }
 }
 
